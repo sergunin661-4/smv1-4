@@ -1,14 +1,11 @@
 #include "sniffer.h"
 #include "ui_sniffer.h"
 #include <iostream>
-#include <fstream>
 #include <stdio.h>
-#include <pcap.h>
 #include <QFileDialog>
 #include <QDebug>
 #include <QTextStream>
 #include <QVector>
-#include <math.h>
 
 
 Sniffer::Sniffer(QWidget *parent) :
@@ -23,82 +20,76 @@ Sniffer::~Sniffer()
     delete ui;
 }
 
-int buff[2000000];
 QString fName;
 header pk;
 int k;
 int i;
-char *m_data;
+int allpackets;
+int u;
 
 void Sniffer::on_actionExit_triggered()
 {
     this->close();
 }
 
+PacketStream ps;
 void Sniffer::on_ok_clicked()
-{   
-    int z;
-    ui->pack->setText("");
-    char *p_data;
-    QFile file(fName);
-    z=ui->ok->text().toInt(); 
-    file.seek(buff[z]);
-    file.read((char*)&pk.pHeader,16);
-    p_data=new char [pk.pHeader.len];
-    file.read(p_data,pk.pHeader.len);
-    for(int i = 0;i < pk.pHeader.len; i++)
-    {
-      QString d;
-      d=QString::number(p_data[i]);
-      int q=d.toInt();
-      QString s=QString::number(q,16).toUpper();
-      ui->pack->insertPlainText(" "+ s);
-    }
+{
+   u=ui->number->text().toInt();
+   qDebug()<< u;
+   ui->pack->setText("");
+   for(int i = 0;i < ps.packets[u].pHeader.caplen; i++)
+   {
+     QString d;
+     d=QString::number(ps.packets[u].m_data[i]);
+     int q=d.toInt();
+     QString s=QString::number(q,16).toUpper();
+     ui->pack->insertPlainText(" "+ s);
+    // qDebug()<<ps.packets[12333].m_data[i];
+   }
 }
 
 void Sniffer::on_open_clicked()
 {
   fName = QFileDialog::getOpenFileName(this,"open the file");
   QFile file(fName);
-  PacketStream ps;
 
   if (!file.open(QIODevice::ReadOnly))
       {
-              qDebug() << "error open file";
+         qDebug() << "error open file";
       }
   else
   {
   file.read((char *)&ps.fHeader,24);
 
+  ui->textEdit->append("linktype\t" + QString::number(ps.fHeader.linktype));
+  ui->textEdit->append("max lenth bytes\t" + QString::number(ps.fHeader.snaplen)) ;
+  ui->textEdit->append("sigfigs\t" + QString::number(ps.fHeader.sigfigs)) ;
+  ui->textEdit->append("thiszone\t" + QString::number( ps.fHeader.thiszone));
+  ui->textEdit->append("major\t" + QString::number(ps.fHeader.version_major)) ;
+  ui->textEdit->append("minor\t" + QString::number( ps.fHeader.version_minor)) ;
+  ui->textEdit->append("magic\t" + QString::number( ps.fHeader.magic)) ;
+  ui->textEdit->append("\n\n\n") ;
     int p=file.size();
-    int allpackets=0;
+    allpackets=0;
     int min=65535;
     int max=0;
-    //char *m_data;
-
-     i=0;
+    i=0;
     while(file.pos()<p)
    {
-     allpackets++;
-     buff[allpackets]=file.pos();
-     file.read((char*)&pk.pHeader,16);
-     m_data=new  char [pk.pHeader.len];
-     file.read(m_data,pk.pHeader.len);
-     ps.packets.push_back((header()));
-     ps.packets[i].pHeader.t1=pk.pHeader.t1;
-     ps.packets[i].pHeader.t2=pk.pHeader.t2;
-     ps.packets[i].pHeader.len=pk.pHeader.len;
-     ps.packets[i].pHeader.caplen=pk.pHeader.caplen;
-     k=i;
-     i++;
-    for(int i = 0;i < pk.pHeader.len; i++)
-    {
+       allpackets++;
+       file.read((char*)&pk.pHeader,16);
+       file.read((char*)&pk.m_data,pk.pHeader.len);
+       ps.packets.append(pk);  
+       k=i;
+      /*for(int k = 0;k<pk.pHeader.len;k++)
+       {
         QString d;
-        d=QString::number(m_data[i]);
+        d=QString::number(pk.m_data[k]);
         int q=d.toInt();
         QString s=QString::number(q,16).toUpper();
         ui->pack->insertPlainText(" "+ s);
-    }
+       }*/
 
     if(pk.pHeader.caplen>max)
      {
@@ -108,31 +99,20 @@ void Sniffer::on_open_clicked()
      {
        min=pk.pHeader.caplen;
      }
-
-     if (m_data!=NULL)
-     {
-     delete []m_data;
-     }
-   }
-    for(int i = 0;i < k; i++)
-    {
      ui->textEdit->append("packets #" + QString::number(i));
-     ui->textEdit->append("t1\t" + QString::number(ps.packets[i].pHeader.t1));
-      ui->textEdit->append("t2\t" + QString::number(ps.packets[i].pHeader.t2));
-       ui->textEdit->append("len\t" + QString::number(ps.packets[i].pHeader.len));
-        ui->textEdit->append("caplen\t" + QString::number(ps.packets[i].pHeader.caplen));
-    }
+     ui->textEdit->append("t1\t" + QString::number(pk.pHeader.t1));
+     ui->textEdit->append("t2\t" + QString::number(pk.pHeader.t2));
+     ui->textEdit->append("len\t" + QString::number(pk.pHeader.len));
+     ui->textEdit->append("caplen\t" + QString::number(pk.pHeader.caplen));
+      i++;
+   }
      ui->min->setText(QString::number(min));
      ui->max->setText(QString::number(max));
-     }
   }
+ }
 
 void Sniffer::on_pushButton_2_clicked()
 {
-    if (m_data!=NULL)
-    {
-    delete []m_data;
-    }
      ui->pack->setText("");
      ui->textEdit->setText("");
      ui->max->setText("");
